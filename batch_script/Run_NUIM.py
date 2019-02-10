@@ -10,14 +10,13 @@ import signal
 # SeqNameList = ['living_room_traj0', 'living_room_traj1', 'living_room_traj2', 'living_room_traj3', 'office_room_traj0', 'office_room_traj1', 'office_room_traj2', 'office_room_traj3', 'not_exist'];
 SeqNameList = ['living_room_traj0', 'living_room_traj2', 'living_room_traj3', 'office_room_traj0', 'office_room_traj2', 'office_room_traj3', 'not_exist'];
 
-Result_root = '/mnt/DATA/tmp/NUIM/Lmk_400/ORBv1_longlife/'
-# Result_root = '/mnt/DATA/tmp/NUIM/ORBv1_Baseline_redo/'
+Result_root = '/mnt/DATA/NUIM/ORBv1_GF/'
 
-Number_GF_List = [60, 80, 100, 130]; # [30, 40, 60, 80, 100, 120, 160, 200]; # [60, 80, 100, 120, 160, 200];  # [100]; # [80, 100, 120]; # 
-# Number_GF_List = [400, 600, 800, 1000, 1500, 2000]; # [1000]; # 
+Number_GF_List = [100]; # [60, 80, 100, 120, 160, 200]; # 
+# Number_GF_List = [800]; # [400, 600, 800, 1000, 1500, 2000]; # 
 
 Num_Repeating = 10 # 20 #  5 # 
-SleepTime = 3 # 10 # 25
+SleepTime = 2
 
 #----------------------------------------------------------------------------------------------------------------------
 class bcolors:
@@ -48,15 +47,10 @@ for ri, num_gf in enumerate(Number_GF_List):
             SeqName = SeqNameList[sn]
             print bcolors.ALERT + "Round: " + str(iteration + 1) + "; Seq: " + SeqName
 
-            File_Setting = '../ORB_Data/NUIM_yaml/NUIM_lmk400.yaml'
-            # File_Setting = '../ORB_Data/NUIM_yaml/NUIM_lmk600.yaml'
-            # File_Setting = '../ORB_Data/NUIM_yaml/NUIM_lmk800.yaml'
-            # File_Setting = '../ORB_Data/NUIM_yaml/NUIM_lmk1000.yaml'
-            # File_Setting = '../ORB_Data/NUIM_yaml/NUIM_lmk1500.yaml'
-            # File_Setting = '../ORB_Data/NUIM_yaml/NUIM_lmk2000.yaml'
+            File_Setting = '../../ORB_Data/NUIM_yaml/NUIM_lmk800.yaml'
 
-            # File_Vocab = '../ORB_Data/ORBvoc.txt'
-            File_Vocab = '../ORB_Data/ORBvoc.bin'
+            # File_Vocab = '../../ORB_Data/ORBvoc.txt'
+            File_Vocab = '../../ORB_Data/ORBvoc.bin'
             File_rosbag  = '/mnt/DATA/Datasets/ICL-NUIM_dataset/BagFiles/' + SeqName + 'n.bag'
             File_traj = Experiment_dir + '/' + SeqName
 

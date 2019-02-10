@@ -1,5 +1,13 @@
 # assuming ros-indigo has been configured properly, and the gcc is the standard 4.8.5 for ubuntu 14.04.5 LTS
 
+# build gtest for unit test
+sudo apt-get install libgtest-dev
+cd /usr/src/gtest
+sudo mkdir build && cd build
+sudo cmake ..
+sudo make -j
+sudo cp libgtest*.a ../
+
 # place all dependencies here
 export DEPENDENCIES_DIR=/mnt/DATA/SDK/
 

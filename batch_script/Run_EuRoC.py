@@ -11,15 +11,13 @@ import signal
 # SeqNameList = ['V1_01_easy', 'V2_01_easy', 'V2_02_medium', 'not_exist'];
 SeqNameList = ['MH_01_easy', 'MH_02_easy', 'MH_03_medium', 'MH_04_difficult', 'MH_05_difficult', 'V1_01_easy', 'V2_01_easy', 'V2_02_medium', 'not_exist'];
 
-# Result_root = '/home/turtlebot/tmp/ORBv1_Baseline_redo/'
-Result_root = '/mnt/DATA/Euclid_Test/ORBv1_Baseline_slow/'
+Result_root = '/mnt/DATA/EuRoC/ORBv1_GF/'
 
-# Number_GF_List = [60, 80, 100, 150, 200]; # [80, 100, 120]; # 
-Number_GF_List = [800]; # [400, 600, 800, 1000, 1500, 2000]; # 
-
+Number_GF_List = [100]; # [60, 80, 100, 150, 200]; # 
+# Number_GF_List = [800]; # [400, 600, 800, 1000, 1500, 2000]; # 
 
 Num_Repeating = 10 # 20 #  5 # 
-SleepTime = 2 # 25
+SleepTime = 2 
 
 #----------------------------------------------------------------------------------------------------------------------
 class bcolors:
@@ -49,29 +47,16 @@ for ri, num_gf in enumerate(Number_GF_List):
             SeqName = SeqNameList[sn]
             print bcolors.ALERT + "Round: " + str(iteration + 1) + "; Seq: " + SeqName
 
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lmk400.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lmk600.yaml'
-            File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lmk800.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lmk1000.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lmk1500.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lmk2000.yaml'
-            #
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lv3_lmk400.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lv3_lmk600.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lv3_lmk800.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lv3_lmk1000.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lv3_lmk1500.yaml'
-            # File_Setting = '../ORB_Data/EuRoC_yaml/EuRoC_lv3_lmk2000.yaml'
+            File_Setting = '../../ORB_Data/EuRoC_yaml/EuRoC_lmk800.yaml'
 
-            # File_Vocab = '../ORB_Data/ORBvoc.txt'
-            File_Vocab = '../ORB_Data/ORBvoc.bin'
+            # File_Vocab = '../../ORB_Data/ORBvoc.txt'
+            File_Vocab = '../../ORB_Data/ORBvoc.bin'
             File_rosbag  = '/mnt/DATA/Datasets/EuRoC_dataset/BagFiles/' + SeqName + '.bag'
-            # File_rosbag  = '/home/turtlebot/DATA/EuRoC_dataset/BagFiles/' + SeqName + '.bag'
 
             File_traj = Experiment_dir + '/' + SeqName
 
             cmd_slam   = str('rosrun GF_ORB_SLAM GF_ORB_SLAM ' + File_Vocab + ' ' + File_Setting + ' ' + str(Number_GF_List[ri]) + ' /cam0/image_raw ' + File_traj)
-            cmd_rosbag = 'rosbag play ' + File_rosbag + ' --clock'  + ' -r 0.2'
+            cmd_rosbag = 'rosbag play ' + File_rosbag + ' --clock' 
             
             print bcolors.WARNING + "cmd_slam: \n"   + cmd_slam   + bcolors.ENDC
             print bcolors.WARNING + "cmd_rosbag: \n" + cmd_rosbag + bcolors.ENDC

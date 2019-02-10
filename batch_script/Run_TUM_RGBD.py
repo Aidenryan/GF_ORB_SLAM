@@ -12,13 +12,13 @@ TumTypeList = ['freiburg2', 'freiburg2'];
 # SeqNameList = ['freiburg2_desk', 'freiburg3_long_office_household', 'not_exist'];
 # TumTypeList = ['freiburg2', 'freiburg3', ' ']; 
 
-Result_root = '/mnt/DATA/tmp/TUM_RGBD/Lmk_400/ORBv1_info_measErr_fullPrior/'
-# Result_root = '/mnt/DATA/tmp/TUM_RGBD/ORBv1_Baseline_redo/'
+Result_root = '/mnt/DATA/TUM_RGBD/ORBv1_GF/'
 
-Number_GF_List = [60, 80, 100, 120]; # [100, 150, 200]; # 
-# Number_GF_List = [300, 400, 600, 800, 1000, 1500, 2000]; # 
+Number_GF_List = [100]; # [60, 80, 100, 120, 150, 200]; # 
+# Number_GF_List = [800]; # [300, 400, 600, 800, 1000, 1500, 2000]; # 
+
 Num_Repeating = 10 # 1 # 
-SleepTime = 2 # 10 # 25
+SleepTime = 2
 
 #----------------------------------------------------------------------------------------------------------------------
 class bcolors:
@@ -48,16 +48,15 @@ for ri, num_gf in enumerate(Number_GF_List):
             SeqName = 'rgbd_dataset_' + SeqNameList[sn]
             print bcolors.ALERT + "Round: " + str(iteration + 1) + "; Seq: " + SeqName
 
-            File_Setting = '../ORB_Data/TUM_RGBD_yaml/Settings_TUM_' + TumTypeList[sn] + '_400.yaml'
-            # File_Setting = '../ORB_Data/TUM_RGBD_yaml/Settings_TUM_' + TumTypeList[sn] + '_2000.yaml'
+            File_Setting = '../../ORB_Data/TUM_RGBD_yaml/Settings_TUM_' + TumTypeList[sn] + '_800.yaml'
 
-            # File_Vocab = '../ORB_Data/ORBvoc.txt'
-            File_Vocab = '../ORB_Data/ORBvoc.bin'
+            # File_Vocab = '../../ORB_Data/ORBvoc.txt'
+            File_Vocab = '../../ORB_Data/ORBvoc.bin'
             File_rosbag  = '/mnt/DATA/Datasets/TUM_RGBD/BagFiles/' + SeqName  + '_small_chunks.bag'
             File_traj = Experiment_dir + '/' + SeqName
 
             cmd_slam   = str('rosrun GF_ORB_SLAM GF_ORB_SLAM ' + File_Vocab + ' ' + File_Setting + ' ' + str(Number_GF_List[ri]) + ' /camera/rgb/image_color ' + File_traj)
-            cmd_rosbag = 'rosbag play ' + File_rosbag # + ' -r 0.5'
+            cmd_rosbag = 'rosbag play ' + File_rosbag 
             
             print bcolors.WARNING + "cmd_slam: \n"   + cmd_slam   + bcolors.ENDC
             print bcolors.WARNING + "cmd_rosbag: \n" + cmd_rosbag + bcolors.ENDC

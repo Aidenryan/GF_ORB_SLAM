@@ -1,0 +1,17 @@
+bin/*
+build/*
+tools/bin_vocabulary
+#CMakeLists.txt
+CMakeLists.txt.user
+CMakeLists.txt.user*
+KeyFrameTrajectory.txt
+KeyFrameR.txt
+AllFrameTrajectory.txt
+#Thirdparty/DBoW2/CMakeLists.txt
+Thirdparty/DBoW2/build/*
+Thirdparty/DBoW2/lib/*
+Thirdparty/g2o/build/*
+Thirdparty/g2o/lib/*
+tools/simu/*
+tools/simuGreedy
+tools/bin_vocabulary

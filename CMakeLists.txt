@@ -3,10 +3,10 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 rosbuild_init()
 
-SET(ROS_BUILD_TYPE Release)
-#IF(NOT ROS_BUILD_TYPE)
-#  SET(ROS_BUILD_TYPE Release)
-#ENDIF()
+# SET(ROS_BUILD_TYPE Release)
+IF(NOT ROS_BUILD_TYPE)
+  SET(ROS_BUILD_TYPE Release)
+ENDIF()
 
 
 include(CheckCXXCompilerFlag)
@@ -30,29 +30,13 @@ ELSE()
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-as-needed -pthread -Wall  -O3 -march=native")
 ENDIF()
 
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wl,--no-as-needed -pthread -Wall  -O3 -march=native ")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-as-needed -pthread -Wall  -O3 -march=native")
-
 MESSAGE(">>>>>  Compiler flags are: " ${CMAKE_CXX_FLAGS})
-
-#SET(CMAKE_BUILD_TYPE Debug)
-#IF(NOT ROS_BUILD_TYPE)
-#  SET(ROS_BUILD_TYPE Debug)
-#ENDIF()
 
 MESSAGE("Build type: " ${ROS_BUILD_TYPE})
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
-
-#find_package(OpenMP)
-#if (OPENMP_FOUND)
-#    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-#    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-#    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-#    MESSAGE("OpenMP flags: " ${OpenMP_CXX_FLAGS})
-#endif()
 
 # customize opencv dir
 if ($ENV{ROS_DISTRO} STREQUAL "indigo")
@@ -61,7 +45,7 @@ if ($ENV{ROS_DISTRO} STREQUAL "indigo")
 elseif ($ENV{ROS_DISTRO} STREQUAL "kinetic")
     # set( OpenCV_DIR /opt/opencv-3.4.1/share/OpenCV )
     set( OpenCV_DIR /opt/opencv3/share/OpenCV )
-    find_package(OpenCV 3.3.1 REQUIRED)
+    find_package(OpenCV 3.4.1 REQUIRED)
 endif()
 MESSAGE("OpenCV include dir: " ${OpenCV_INCLUDE_DIRS})
 
@@ -169,13 +153,13 @@ target_link_libraries(bin_vocabulary ${LIBS})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 rosbuild_add_executable(testObs
     ${SRCS}
-#   ./test/test_Initial.cpp
+    #   ./test/test_Initial.cpp
     ./test/test_Kine_1.cpp
     ./test/test_Kine_2.cpp
     ./test/test_Jacobian.cpp
     ./test/test_Greedy.cpp
     ./test/test_RANSAC.cpp
-#    ./test/test_LazierBound.cpp
+    #    ./test/test_LazierBound.cpp
     # ./test/test_BoxLOG.cpp
     # ./test/test_GoodMap.cpp
     ./test/main.cpp
