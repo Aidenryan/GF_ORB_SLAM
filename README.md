@@ -6,7 +6,7 @@ This repo is an integration of good feature matching to monocular ORB-SLAM.  Whe
 
 To build GF-ORB-SLAM, first clone the repo to your ros workspace:
 
-		git clone https://github.com/raulmur/ORB_SLAM.git ORB_SLAM
+	git clone git@github.com:peter-zhao/GF_ORB_SLAM.git
 
 Then follow the instructions of ORB-SLAM to prepare the dependencies of ORB-SLAM: eigen, cholmod, gl/glew.  
 On top of that, build additional dependencies for good feature by calling:
@@ -32,8 +32,6 @@ If you use GF-ORB-SLAM in an academic work, please cite:
 	  organization={IEEE}
 	}
 
-
-##Check out our new [ORB-SLAM2](https://github.com/raulmur/ORB_SLAM2) (Monocular, Stereo and RGB-D)
 ---
 # ORB-SLAM Monocular
 **Authors:** [Raul Mur-Artal](http://webdiis.unizar.es/~raulmur/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/), [J. M. M. Montiel](http://webdiis.unizar.es/~josemari/) and [Dorian Galvez-Lopez](http://doriangalvez.com/) ([DBoW2](https://github.com/dorian3d/DBoW2))
