@@ -2,8 +2,12 @@
 
 Good feature matching is an enhancement module that is designed for feature-based BA SLAM, such as ORB-SLAM.  The main advantage of good feature matching, as opposed to the conventional batch feature matching, is the better trade-off of performance-efficiency.  
 
-<img src="https://lh3.googleusercontent.com/Vxz3r5Miy-_3rcJEFu8tSUs8VatnN-v2cottAi7Uw-N8IQnbbTGEmxkmd5S9gP94D-meSIrGgNQZNRmYYevVNWZUUmtqaxyl5V5635IAJ1sK8GHQ5wU=w472" />
-Performance vs. latency evaluation on EuRoC monocular sequences (left-cam only)
+
+<figure>
+  <img src="https://github.com/peter-zhao/GF_ORB_SLAM/blob/master/batch_script/RMSE_vs_Latency_EuRoC.png" alt="EuRoC" style="width:100%">
+  <figcaption>Performance vs. latency evaluation on EuRoC monocular sequences (left-cam only)</figcaption>
+</figure>
+
 
 This repo is an integration of good feature matching to monocular ORB-SLAM.  When tested on multiple public benchmarks, GF-ORB-SLAM yields the same level of pose tracking latency, while preserving the accuracy & robustness of ORB-SLAM baseline.
 
