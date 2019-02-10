@@ -21,8 +21,8 @@
 #include "FramePublisher.h"
 #include "Tracking.h"
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
+// #include <opencv2/core/core.hpp>
+// #include <opencv2/highgui/highgui.hpp>
 
 #include<boost/thread.hpp>
 #include<ros/ros.h>
@@ -38,8 +38,21 @@ FramePublisher::FramePublisher()
     mbUpdated = true;
 
     mImagePub = mNH.advertise<sensor_msgs::Image>("ORB_SLAM/Frame",10,true);
-
     PublishFrame();
+
+    std::cout << "func FramePublisher: create frame publisher of size 640 * 480" << std::endl;
+}
+
+FramePublisher::FramePublisher(int nRows, int nCols)
+{
+    mState=Tracking::SYSTEM_NOT_READY;
+    mIm = cv::Mat(nRows,nCols,CV_8UC3, cv::Scalar(0,0,0));
+    mbUpdated = true;
+
+    mImagePub = mNH.advertise<sensor_msgs::Image>("ORB_SLAM/Frame",10,true);
+    PublishFrame();
+
+    std::cout << "func FramePublisher: create frame publisher of size " << nCols << " * " << nRows << std::endl;
 }
 
 void FramePublisher::SetMap(Map *pMap)
@@ -75,7 +88,7 @@ cv::Mat FramePublisher::DrawFrame()
         mIm.copyTo(im);
 
         if(mState==Tracking::NOT_INITIALIZED)
-        {            
+        {
             vIniKeys = mvIniKeys;
         }
         else if(mState==Tracking::INITIALIZING)
@@ -108,11 +121,13 @@ cv::Mat FramePublisher::DrawFrame()
                 cv::line(im,vIniKeys[i].pt,vCurrentKeys[vMatches[i]].pt,
                         cv::Scalar(0,255,0));
             }
-        }        
+        }
     }
     else if(state==Tracking::WORKING) //TRACKING
     {
         mnTracked=0;
+        mnGood=0;
+        //
         const float r = 5;
         for(unsigned int i=0;i<vMatchedMapPoints.size();i++)
         {
@@ -125,10 +140,26 @@ cv::Mat FramePublisher::DrawFrame()
                 pt2.y=vCurrentKeys[i].pt.y+r;
                 if(!mvbOutliers[i])
                 {
-                    cv::rectangle(im,pt1,pt2,cv::Scalar(0,255,0));
-                    cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,255,0),-1);
+                    // plot inliers
+                    if(mvbGoodFeature[i]) {
+                        // good inliers
+                        cv::rectangle(im,pt1,pt2,cv::Scalar(0,0,255));
+                        cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,0,255),-1);
+                        mnGood++;
+                    }
+                    else {
+                        // normal inliers
+                        cv::rectangle(im,pt1,pt2,cv::Scalar(0,255,0));
+                        cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,255,0),-1);
+                    }
                     mnTracked++;
                 }
+                else {
+                    // plot outliers
+                    cv::rectangle(im,pt1,pt2,cv::Scalar(0,255,255));
+                    cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,255,255),-1);
+                }
+
             }
         }
 
@@ -142,13 +173,16 @@ cv::Mat FramePublisher::DrawFrame()
 
 void FramePublisher::PublishFrame()
 {
+    // cerr << "DrawFrame" << endl;
     cv::Mat im = DrawFrame();
     cv_bridge::CvImage rosImage;
+    // cerr << "clone" << endl;
     rosImage.image = im.clone();
     rosImage.header.stamp = ros::Time::now();
     rosImage.encoding = "bgr8";
-
+    // cerr << "publish" << endl;
     mImagePub.publish(rosImage.toImageMsg());
+    // cerr << "spinOnce" << endl;
     ros::spinOnce();
 }
 
@@ -166,11 +200,12 @@ void FramePublisher::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
         s << " TRACKING ";
         int nKFs = mpMap->KeyFramesInMap();
         int nMPs = mpMap->MapPointsInMap();
-        s << " - KFs: " << nKFs << " , MPs: " << nMPs << " , Tracked: " << mnTracked;
+        s << " - KFs: " << nKFs << " , MPs: " << nMPs << " , Tracked: " << mnTracked << " , Good: " << mnGood;
     }
     else if(nState==Tracking::LOST)
     {
         s << " TRACK LOST. TRYING TO RELOCALIZE ";
+        ROS_INFO( " TRACK LOST. TRYING TO RELOCALIZE ");
     }
     else if(nState==Tracking::SYSTEM_NOT_READY)
     {
@@ -178,7 +213,8 @@ void FramePublisher::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
     }
 
     int baseline=0;
-    cv::Size textSize = cv::getTextSize(s.str(),cv::FONT_HERSHEY_PLAIN,1,1,&baseline);
+//    cv::Size textSize = cv::getTextSize(s.str(),cv::FONT_HERSHEY_PLAIN,1,1,&baseline);
+    cv::Size textSize = cv::getTextSize(s.str(),cv::FONT_HERSHEY_PLAIN,0.7,1,&baseline);
 
     imText = cv::Mat(im.rows+textSize.height+10,im.cols,im.type());
     im.copyTo(imText.rowRange(0,im.rows).colRange(0,im.cols));
@@ -190,10 +226,22 @@ void FramePublisher::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 void FramePublisher::Update(Tracking *pTracker)
 {
     boost::mutex::scoped_lock lock(mMutex);
+
+//    std::cout << "Input image size: " << pTracker->mCurrentFrame.im.cols
+//              << ", " << pTracker->mCurrentFrame.im.rows
+//              << ", " << pTracker->mCurrentFrame.im.channels() << std::endl << std::endl;
+
+//    std::cout << "Target image size: " << mIm.cols
+//              << ", " << mIm.rows
+//              << ", " << mIm.channels() << std::endl << std::endl;
+
     pTracker->mCurrentFrame.im.copyTo(mIm);
     mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
     mvpMatchedMapPoints=pTracker->mCurrentFrame.mvpMapPoints;
     mvbOutliers = pTracker->mCurrentFrame.mvbOutlier;
+
+    //
+    mvbGoodFeature = pTracker->mCurrentFrame.mvbGoodFeature;
 
     if(pTracker->mLastProcessedState==Tracking::INITIALIZING)
     {

@@ -21,8 +21,30 @@
 #ifndef INITIALIZER_H
 #define INITIALIZER_H
 
-#include<opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
+//#if CV_MAJOR_VERSION == 3
+//#include <opencv2/sfm.hpp>
+//#endif
 #include "Frame.h"
+
+
+/* --- options of alternative initialization methods --- */
+// for snakey @Alex
+//#define INIT_WITH_MOTION_PRIOR
+//#define PRED_WITH_MOTION_PRIOR
+//#define PRED_HORIZON					2.5
+
+#define TIME_STAMP_MATCH_THRESH         0.1   // 0.01
+
+// param used in initializations
+#ifdef INIT_WITH_MOTION_PRIOR
+    #define THRES_INIT_MPT_NUM          20 // 40 // 60 //
+    #define SRH_WINDOW_SIZE_INIT        100 // 200 // 150 //
+#else
+    #define THRES_INIT_MPT_NUM          100 // 80 //
+    #define SRH_WINDOW_SIZE_INIT        100
+#endif
+
 
 
 namespace ORB_SLAM
@@ -41,6 +63,13 @@ public:
     // Selects a model and tries to recover the motion and the structure from motion
     bool Initialize(const Frame &CurrentFrame, const vector<int> &vMatches12,
                     cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated);
+
+    // modified init func with motion prior, e.g. from controller or AR Tag
+    int Initialize_withRT(const Frame &CurrentFrame, const vector<int> &vMatches12,
+                           const cv::Mat &R21, const cv::Mat &t21,
+                           vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated);
+
+    void CrossProductMatrix(const cv::Mat &x, cv::Mat & Cx);
 
 
 private:
@@ -66,8 +95,8 @@ private:
     void Normalize(const vector<cv::KeyPoint> &vKeys, vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T);
 
     int CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
-                       const vector<Match> &vMatches12, vector<bool> &vbInliers,
-                       const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax);
+                const vector<Match> &vMatches12, vector<bool> &vbInliers,
+                const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax);
 
     void DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t);
 
@@ -92,7 +121,7 @@ private:
     int mMaxIterations;
 
     // Ransac sets
-    vector<vector<size_t> > mvSets;   
+    vector<vector<size_t> > mvSets;
 
 };
 

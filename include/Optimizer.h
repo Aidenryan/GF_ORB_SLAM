@@ -27,7 +27,18 @@
 #include "LoopClosing.h"
 #include "Frame.h"
 
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/types/sim3/types_seven_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/core/block_solver.h"
+#include "Thirdparty/g2o/g2o/core/optimization_algorithm_levenberg.h"
+#include "Thirdparty/g2o/g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include "Thirdparty/g2o/g2o/types/sba/types_six_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
+#include "Thirdparty/g2o/g2o/solvers/dense/linear_solver_dense.h"
+
+#include <Eigen/StdVector>
+
+#include "Converter.h"
+
 
 namespace ORB_SLAM
 {
@@ -41,6 +52,21 @@ public:
     void static GlobalBundleAdjustemnt(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL);
     void static LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag=NULL);
     int static PoseOptimization(Frame* pFrame);
+
+    int static PoseOptimization(Frame* pFrame, int &N_MP_Used);
+    float static PoseOptimization2(Frame* pFrame);
+
+    float static PoseOptimizationOOMC(Frame* pFrame, const std::vector<size_t> Triplet2Use, cv::Mat &pose);
+    float static PoseOptimizationOOMC_2(Frame *pFrame, const std::set<int> & PtsIdx2Use);
+
+    int static PoseOptimization_GFSLAM(Frame *pFrame, const vector<GoodPoint> & mpSorted, const double & ObsThreshold, int & N_MP_Used);
+    int static PoseOptimization_Selected(Frame *pFrame, const vector<GoodPoint> & mpSorted);
+    int static PoseOptimization_RANSAC(Frame *pFrame, const vector<GoodPoint> & mpSorted);
+
+    float static GetPoseGraph(Frame *pFrame, g2o::SparseOptimizer & optimizer, vector<g2o::EdgeSE3ProjectXYZ*>& vpEdges, int &nInitial0);
+    float static EvaluateInlierRatio(Frame *pFrame, g2o::SparseOptimizer & optimizer, cv::Mat & Pose2Evaluate,
+                                     vector<g2o::EdgeSE3ProjectXYZ*>& vpEdges, int & nInitialCorrespondences);
+
 
     void static OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF, g2o::Sim3 &Scurw,
                                        LoopClosing::KeyFrameAndPose &NonCorrectedSim3,

@@ -30,7 +30,7 @@
 
 #include <ros/ros.h>
 
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/types/sim3/types_seven_dof_expmap.h"
 
 namespace ORB_SLAM
 {
@@ -40,6 +40,13 @@ LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc):
 {
     mnCovisibilityConsistencyTh = 3;
     mpMatchedKF = NULL;
+
+#ifdef DISABLE_LOOP_CLOSURE
+    std::cout << "Main: loop closure disabled!" << std::endl;
+#else
+    std::cout << "Main: loop closure enabled!" << std::endl;
+#endif
+
 }
 
 void LoopClosing::SetTracker(Tracking *pTracker)
@@ -60,20 +67,28 @@ void LoopClosing::Run()
 
     while(ros::ok())
     {
+
+#ifdef DISABLE_LOOP_CLOSURE
+        // do nothing
+
+#else
+
         // Check if there are keyframes in the queue
         if(CheckNewKeyFrames())
         {
             // Detect loop candidates and check covisibility consistency
             if(DetectLoop())
             {
-               // Compute similarity transformation [sR|t]
-               if(ComputeSim3())
-               {
-                   // Perform loop fusion and pose graph optimization
-                   CorrectLoop();
-               }
+                // Compute similarity transformation [sR|t]
+                if(ComputeSim3())
+                {
+                    // Perform loop fusion and pose graph optimization
+                    CorrectLoop();
+                }
             }
         }
+
+#endif
 
         ResetIfRequested();
         r.sleep();
@@ -339,7 +354,7 @@ bool LoopClosing::ComputeSim3()
     if(!bMatch)
     {
         for(int i=0; i<nInitialCandidates; i++)
-             mvpEnoughConsistentCandidates[i]->SetErase();
+            mvpEnoughConsistentCandidates[i]->SetErase();
         mpCurrentKF->SetErase();
         return false;
     }
@@ -426,7 +441,7 @@ void LoopClosing::CorrectLoop()
         cv::Mat Tiw = pKFi->GetPose();
 
         if(pKFi!=mpCurrentKF)
-        {            
+        {
             cv::Mat Tic = Tiw*Twc;
             cv::Mat Ric = Tic.rowRange(0,3).colRange(0,3);
             cv::Mat tic = Tic.rowRange(0,3).col(3);
@@ -488,7 +503,7 @@ void LoopClosing::CorrectLoop()
 
         // Make sure connections are updated
         pKFi->UpdateConnections();
-    }    
+    }
 
     // Start Loop Fusion
     // Update matched map points and replace if duplicated

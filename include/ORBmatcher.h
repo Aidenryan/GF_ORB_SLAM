@@ -29,6 +29,8 @@
 #include"MapPoint.h"
 #include"KeyFrame.h"
 #include"Frame.h"
+#include"Util.hpp"
+//#include"Observability.h"
 
 
 namespace ORB_SLAM
@@ -43,9 +45,194 @@ public:
     // Computes the Hamming distance between two ORB descriptors
     static int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);
 
+
+    // Search matches between Frame keypoints and projected MapPoints. Returns number of matches
+    // Good features are searched with a coarser radius than the rest
+    // Used to track the local map (Tracking)
+    int SearchByProjection_GoodFeature(Frame &F, const vector<MapPoint*> &vpMapPoints,
+                                       const float th_good, const float th_rest);
+
+    int SearchByProjection_GoodFeature(Frame &CurrentFrame, const Frame &LastFrame,
+                                       const float th_good, const float th_rest);
+
+
     // Search matches between Frame keypoints and projected MapPoints. Returns number of matches
     // Used to track the local map (Tracking)
     int SearchByProjection(Frame &F, const std::vector<MapPoint*> &vpMapPoints, const float th=3);
+    // DEBUG ONLY
+    int SearchByProjectionWithLogging(vector<MatchingLog> & vecLog, arma::mat & mCurrentInfoMat,
+                                      Frame &F, const vector<MapPoint*> &vpMapPoints, const float th=3);
+
+    //
+    int SearchByProjection_Budget(Frame &F, const vector<MapPoint*> &vpMapPoints,
+                                  const float th, const double time_constr);
+
+    //
+    inline int SearchByProjection_OnePoint(Frame &F, MapPoint* pMP, const float th)
+    {
+        const bool bFactor = th!=1.0;
+
+        if(!pMP->mbTrackInView)
+            return -1;
+
+        if(pMP->isBad())
+            return -1;
+
+        const int &nPredictedLevel = pMP->mnTrackScaleLevel;
+
+        // The size of the window will depend on the viewing direction
+        float r = RadiusByViewingCos(pMP->mTrackViewCos);
+
+        if(bFactor)
+            r*=th;
+
+        vector<size_t> vNearIndices =
+                F.GetFeaturesInArea(pMP->mTrackProjX,pMP->mTrackProjY,r*F.mvScaleFactors[nPredictedLevel],nPredictedLevel-1,nPredictedLevel);
+
+        if(vNearIndices.empty())
+            return -1;
+
+        cv::Mat MPdescriptor = pMP->GetDescriptor();
+
+        int bestDist=INT_MAX;
+        int bestLevel= -1;
+        int bestDist2=INT_MAX;
+        int bestLevel2 = -1;
+        int bestIdx =-1 ;
+
+        // Get best and second matches with near keypoints
+        for(vector<size_t>::iterator vit=vNearIndices.begin(), vend=vNearIndices.end(); vit!=vend; vit++)
+        {
+            size_t idx = *vit;
+
+            if(F.mvpMapPoints[idx])
+                continue;
+
+            cv::Mat d=F.mDescriptors.row(idx);
+
+            const int dist = DescriptorDistance(MPdescriptor,d);
+
+            if(dist<bestDist)
+            {
+                bestDist2=bestDist;
+                bestDist=dist;
+                bestLevel2 = bestLevel;
+                bestLevel = F.mvKeysUn[idx].octave;
+                bestIdx=idx;
+            }
+            else if(dist<bestDist2)
+            {
+                bestLevel2 = F.mvKeysUn[idx].octave;
+                bestDist2=dist;
+            }
+        }
+
+        // Apply ratio to second match (only if best and second are in the same scale level)
+        if(bestDist<=TH_HIGH)
+        {
+            if(bestLevel==bestLevel2 && bestDist>mfNNratio*bestDist2)
+                return -1;
+
+            F.mvpMapPoints[bestIdx]=pMP;
+
+            // store the match score for each frame-to-map match
+            F.mvpMatchScore[bestIdx] = bestDist;
+
+            return bestIdx;
+        }
+        else
+            return -1;
+    }
+    // DEBUG ONLY
+    int SearchByProjectionWithLogging_OnePoint(vector<MatchingLog> & vecLog, arma::mat & accuMat,
+                                                      Frame &F, MapPoint* pMP, const float th);
+
+    inline void GetCandidates(Frame &F, MapPoint* pMP, const float th)
+    {
+        const bool bFactor = th!=1.0;
+
+        if(!pMP->mbTrackInView)
+            return ;
+
+        if(pMP->isBad())
+            return ;
+
+        const int &nPredictedLevel = pMP->mnTrackScaleLevel;
+
+        // The size of the window will depend on the viewing direction
+        float r = RadiusByViewingCos(pMP->mTrackViewCos);
+
+        if(bFactor)
+            r*=th;
+
+        pMP->mvMatchCandidates =
+                F.GetFeaturesInArea(pMP->mTrackProjX,pMP->mTrackProjY,r*F.mvScaleFactors[nPredictedLevel],nPredictedLevel-1,nPredictedLevel);
+    }
+
+    inline int MatchCandidates(Frame &F, MapPoint* pMP)
+    {
+
+        if(!pMP->mbTrackInView)
+            return -1;
+
+        if(pMP->isBad())
+            return -1;
+
+        if(pMP->mvMatchCandidates.empty())
+            return -1;
+
+        cv::Mat MPdescriptor = pMP->GetDescriptor();
+
+        int bestDist=INT_MAX;
+        int bestLevel= -1;
+        int bestDist2=INT_MAX;
+        int bestLevel2 = -1;
+        int bestIdx =-1 ;
+
+        // Get best and second matches with near keypoints
+        for(vector<size_t>::iterator vit=pMP->mvMatchCandidates.begin(), vend=pMP->mvMatchCandidates.end(); vit!=vend; vit++)
+        {
+            size_t idx = *vit;
+
+            if(F.mvpMapPoints[idx])
+                continue;
+
+            cv::Mat d=F.mDescriptors.row(idx);
+
+            const int dist = DescriptorDistance(MPdescriptor,d);
+
+            if(dist<bestDist)
+            {
+                bestDist2=bestDist;
+                bestDist=dist;
+                bestLevel2 = bestLevel;
+                bestLevel = F.mvKeysUn[idx].octave;
+                bestIdx=idx;
+            }
+            else if(dist<bestDist2)
+            {
+                bestLevel2 = F.mvKeysUn[idx].octave;
+                bestDist2=dist;
+            }
+        }
+
+        // Apply ratio to second match (only if best and second are in the same scale level)
+        if(bestDist<=TH_HIGH)
+        {
+            if(bestLevel==bestLevel2 && bestDist>mfNNratio*bestDist2)
+                return -1;
+
+            F.mvpMapPoints[bestIdx]=pMP;
+
+            // store the match score for each frame-to-map match
+            F.mvpMatchScore[bestIdx] = bestDist;
+
+            return bestIdx;
+        }
+        else
+            return -1;
+    }
+
 
     // Project MapPoints tracked in last frame into the current frame and search matches.
     // Used to track from previous frame (Tracking)
@@ -57,7 +244,7 @@ public:
 
     // Project MapPoints using a Similarity Transformation and search matches.
     // Used in loop detection (Loop Closing)
-     int SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const std::vector<MapPoint*> &vpPoints, std::vector<MapPoint*> &vpMatched, int th);
+    int SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const std::vector<MapPoint*> &vpPoints, std::vector<MapPoint*> &vpMatched, int th);
 
     // Search matches between MapPoints in a KeyFrame and ORB in a Frame.
     // Brute force constrained to ORB that belong to the same vocabulary node (at a certain level)

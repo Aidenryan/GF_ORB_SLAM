@@ -36,6 +36,18 @@ MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
     Pos.copyTo(mWorldPos);
     mnId=nNextId++;
     mNormalVector = cv::Mat::zeros(3,1,CV_32F);
+
+    // temporalObs
+    ObsScore = -1.0;
+    ObsRank = 0;
+    //
+    matchedAtFrameId = 0;
+    updateAtFrameId = 0;
+    goodAtFrameId = 0;
+    mnUsedForLocalMap = 0;
+    //
+    u_proj = FLT_MAX;
+    v_proj = FLT_MAX;
 }
 
 void MapPoint::SetWorldPos(const cv::Mat &Pos)

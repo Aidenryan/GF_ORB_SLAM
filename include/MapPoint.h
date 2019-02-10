@@ -25,8 +25,11 @@
 #include"KeyFrame.h"
 #include"Map.h"
 
-#include<boost/thread.hpp>
+#define ARMA_NO_DEBUG
+#include "armadillo"
 
+#include<boost/thread.hpp>
+#include <opencv2/core/core.hpp>
 
 namespace ORB_SLAM
 {
@@ -40,6 +43,9 @@ class MapPoint
 {
 public:
     MapPoint(const cv::Mat &Pos, KeyFrame* pRefKF, Map* pMap);
+
+    // for unit test only; not used in actual application
+    MapPoint() {};
 
     void SetWorldPos(const cv::Mat &Pos);
     cv::Mat GetWorldPos();
@@ -74,6 +80,12 @@ public:
     float GetMinDistanceInvariance();
     float GetMaxDistanceInvariance();
 
+    //
+    static bool sortMapPointGood(const MapPoint * p1,  const MapPoint * p2) {
+        return p1->goodAtFrameId > p2->goodAtFrameId;
+    }
+
+
 public:
     long unsigned int mnId;
     static long unsigned int nNextId;
@@ -97,7 +109,29 @@ public:
     long unsigned int mnCorrectedByKF;
     long unsigned int mnCorrectedReference;
 
-protected:    
+    // XXX: Changed from protected to public!
+    // Tracking counters
+    int mnVisible;
+    int mnFound;
+
+    // Observability
+    arma::mat H_meas;
+    arma::mat H_proj;
+    arma::mat ObsMat;
+    arma::vec ObsVector;
+    double ObsScore;
+    int ObsRank;
+    //
+    float u_proj, v_proj;
+    //
+    long unsigned int matchedAtFrameId;
+    long unsigned int updateAtFrameId;
+    long unsigned int goodAtFrameId;
+    long unsigned int mnUsedForLocalMap;
+
+    std::vector<size_t> mvMatchCandidates;
+
+protected:
 
      // Position in absolute coordinates
      cv::Mat mWorldPos;
@@ -113,10 +147,6 @@ protected:
 
      // Reference KeyFrame
      KeyFrame* mpRefKF;
-
-     // Tracking counters
-     int mnVisible;
-     int mnFound;
 
      // Bad flag (we do not currently erase MapPoint from memory)
      bool mbBad;

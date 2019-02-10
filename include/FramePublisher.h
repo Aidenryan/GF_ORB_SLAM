@@ -43,6 +43,8 @@ class FramePublisher
 public:
     FramePublisher();    
 
+    FramePublisher(int nRows, int nCols);
+
     void Update(Tracking *pTracker);
 
     void Refresh();
@@ -62,8 +64,13 @@ protected:
 
     vector<bool> mvbOutliers;
 
+    //
+    vector<bool> mvbGoodFeature;
+
+
     vector<MapPoint*> mvpMatchedMapPoints;
     int mnTracked;
+    int mnGood;
     vector<cv::KeyPoint> mvIniKeys;
     vector<int> mvIniMatches;
 

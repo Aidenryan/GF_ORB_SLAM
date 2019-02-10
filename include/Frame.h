@@ -35,7 +35,7 @@ namespace ORB_SLAM
 #define FRAME_GRID_ROWS 48
 #define FRAME_GRID_COLS 64
 
-class tracking;
+class Tracking;
 class MapPoint;
 class KeyFrame;
 class KeyFrameDatabase;
@@ -81,12 +81,24 @@ public:
     // MapPoints associated to keypoints, NULL pointer if not association
     std::vector<MapPoint*> mvpMapPoints;
 
+    std::vector<int> mvpMatchScore;
+
     // Flag to identify outlier associations
     std::vector<bool> mvbOutlier;
 
+    std::vector<bool> mvbCandidate;
+
+    std::vector<bool> mvbJacobBuilt;
+
+    //
+    std::vector<bool> mvbGoodFeature;
+
+    //
+
+
     // Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints
-    static float mfGridElementWidthInv;
-    static float mfGridElementHeightInv;
+    float mfGridElementWidthInv;
+    float mfGridElementHeightInv;
     std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
 
     // Camera Pose
@@ -100,7 +112,12 @@ public:
 
     void ComputeBoW();
 
+    cv::Mat getTwc();
+
     void UpdatePoseMatrices();
+
+    // Modified from isInFrustum, computing the re-projection error of map points (that are not used in Good Feature pose optimization)
+    void getProjectError(MapPoint * pt3D, cv::KeyPoint * pt2D, float & d_u, float & d_v);
 
     // Check if a MapPoint is in the frustum of the camera and also fills variables of the MapPoint to be used by the tracking
     bool isInFrustum(MapPoint* pMP, float viewingCosLimit);

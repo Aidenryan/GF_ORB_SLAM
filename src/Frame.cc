@@ -29,7 +29,6 @@ long unsigned int Frame::nNextId=0;
 bool Frame::mbInitialComputations=true;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy;
 int Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
-float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
 Frame::Frame()
 {}
@@ -40,7 +39,7 @@ Frame::Frame(const Frame &frame)
      mK(frame.mK.clone()), mDistCoef(frame.mDistCoef.clone()), N(frame.N), mvKeys(frame.mvKeys), mvKeysUn(frame.mvKeysUn),
      mBowVec(frame.mBowVec), mFeatVec(frame.mFeatVec), mDescriptors(frame.mDescriptors.clone()),
      mvpMapPoints(frame.mvpMapPoints), mvbOutlier(frame.mvbOutlier),
-     mnId(frame.mnId),
+     mfGridElementWidthInv(frame.mfGridElementWidthInv), mfGridElementHeightInv(frame.mfGridElementHeightInv),mnId(frame.mnId),
      mpReferenceKF(frame.mpReferenceKF), mnScaleLevels(frame.mnScaleLevels), mfScaleFactor(frame.mfScaleFactor),
      mvScaleFactors(frame.mvScaleFactors), mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2)
 {
@@ -61,11 +60,20 @@ Frame::Frame(cv::Mat &im_, const double &timeStamp, ORBextractor* extractor, ORB
 
     N = mvKeys.size();
 
-    if(mvKeys.empty())
+    if(mvKeys.empty()) {
+        std::cout << "no key points being detected!" << std::endl;
         return;
+    }
 
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
 
+    mvpMatchScore = vector<int>(N,static_cast<int>(999));
+
+    //
+    // TODO
+    // replace the default opencv distortion model with kilabr compatable impl, as found from here:
+    // https://github.com/schneith/undistorter
+    //
     UndistortKeyPoints();
 
 
@@ -125,6 +133,12 @@ Frame::Frame(cv::Mat &im_, const double &timeStamp, ORBextractor* extractor, ORB
 
     mvbOutlier = vector<bool>(N,false);
 
+    mvbCandidate = vector<bool>(N,true);
+
+    mvbJacobBuilt = vector<bool>(N,false);
+
+    //
+    mvbGoodFeature = vector<bool>(N,false);
 }
 
 void Frame::UpdatePoseMatrices()
@@ -133,6 +147,21 @@ void Frame::UpdatePoseMatrices()
     mtcw = mTcw.rowRange(0,3).col(3);
     mOw = -mRcw.t()*mtcw;
 }
+
+//
+cv::Mat Frame::getTwc() {
+    //
+    cv::Mat Rwc = mTcw.rowRange(0,3).colRange(0,3).t();
+    cv::Mat twc = -Rwc*mTcw.rowRange(0,3).col(3);
+    //
+    cv::Mat Twc = cv::Mat::eye(4,4,CV_32F);
+
+    Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
+    twc.copyTo(Twc.rowRange(0,3).col(3));
+
+    return Twc;
+}
+
 
 bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 {
@@ -144,7 +173,7 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
     // 3D in camera coordinates
     const cv::Mat Pc = mRcw*P+mtcw;
     const float PcX = Pc.at<float>(0);
-    const float PcY= Pc.at<float>(1);
+    const float PcY = Pc.at<float>(1);
     const float PcZ = Pc.at<float>(2);
 
     // Check positive depth
@@ -196,6 +225,77 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 
     return true;
 }
+
+
+void Frame::getProjectError(MapPoint * pt3D, cv::KeyPoint * pt2D, float & d_u, float & d_v) {
+
+        // init error variable
+        d_u = FLT_MAX;
+        d_v = FLT_MAX;
+    //    std::cout << "image coord = "
+    //              << pt2D->pt.x << ", "
+    //              << pt2D->pt.y << std::endl;
+
+        // 3D in absolute coordinates
+        cv::Mat P = pt3D->GetWorldPos();
+    //    std::cout << "world coord = "
+    //              << P.at<float>(0) << ", "
+    //              << P.at<float>(1) << ", "
+    //              << P.at<float>(2) << std::endl;
+
+        // 3D in camera coordinates
+        cv::Mat mRcw_tmp = this->mTcw.rowRange(0,3).colRange(0,3);
+        cv::Mat mtcw_tmp = this->mTcw.rowRange(0,3).col(3);
+
+        const cv::Mat Pc = mRcw_tmp * P + mtcw_tmp;
+        const float PcX = Pc.at<float>(0);
+        const float PcY = Pc.at<float>(1);
+        const float PcZ = Pc.at<float>(2);
+    //    std::cout << "cam coord = "
+    //              << PcX << ", "
+    //              << PcY << ", "
+    //              << PcZ << std::endl;
+
+        // Check positive depth
+        if(PcZ<0.0)
+            return ;
+
+        // Project in image and check it is not outside
+        const float invz = 1.0/PcZ;
+        const float u=fx*PcX*invz+cx;
+        const float v=fy*PcY*invz+cy;
+
+        if(u<mnMinX || u>mnMaxX)
+            return ;
+        if(v<mnMinY || v>mnMaxY)
+            return ;
+
+    //    // Check distance is in the scale invariance region of the MapPoint
+    //    const float maxDistance = pMP->GetMaxDistanceInvariance();
+    //    const float minDistance = pMP->GetMinDistanceInvariance();
+    //    const cv::Mat PO = P-mOw;
+    //    const float dist = cv::norm(PO);
+
+    //    if(dist<minDistance || dist>maxDistance)
+    //        return ;
+
+    //   // Check viewing angle
+    //    cv::Mat Pn = pMP->GetNormal();
+
+    //    float viewCos = PO.dot(Pn)/dist;
+
+    //    if(viewCos<0.5)
+    //        return ;
+
+        // Compute the distance between pixel <u,v> & the input pt2D
+        //    pErr = sqrt(pow(pt2D->pt.x - u, 2) + pow(pt2D->pt.y - v, 2));
+        d_u = pt2D->pt.x - u;
+        d_v = pt2D->pt.y - v;
+    //    std::cout << "proj pixel = [" << pt2D->pt.x << ", " << pt2D->pt.y << "]; meas. pixel = [" << u << ", " << v << "]" << std::endl;
+
+        return ;
+    }
+
 
 vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const float  &r, int minLevel, int maxLevel) const
 {
@@ -315,6 +415,10 @@ void Frame::UndistortKeyPoints()
         kp.pt.x=mat.at<float>(i,0);
         kp.pt.y=mat.at<float>(i,1);
         mvKeysUn[i]=kp;
+
+//        std::cout << "undist pt " << i
+//                  << " = < " << mvKeysUn[i].pt.x << ", "
+//                  << mvKeysUn[i].pt.y << " >" << std::endl;
     }
 }
 
@@ -322,21 +426,62 @@ void Frame::ComputeImageBounds()
 {
     if(mDistCoef.at<float>(0)!=0.0)
     {
-        cv::Mat mat(4,2,CV_32F);
-        mat.at<float>(0,0)=0.0; mat.at<float>(0,1)=0.0;
-        mat.at<float>(1,0)=im.cols; mat.at<float>(1,1)=0.0;
-        mat.at<float>(2,0)=0.0; mat.at<float>(2,1)=im.rows;
-        mat.at<float>(3,0)=im.cols; mat.at<float>(3,1)=im.rows;
+//        cv::Mat mat(4,2,CV_32F);
+//        mat.at<float>(0,0)=0.0; mat.at<float>(0,1)=0.0;
+//        mat.at<float>(1,0)=im.cols; mat.at<float>(1,1)=0.0;
+//        mat.at<float>(2,0)=0.0; mat.at<float>(2,1)=im.rows;
+//        mat.at<float>(3,0)=im.cols; mat.at<float>(3,1)=im.rows;
+
+//        // Undistort corners
+//        mat=mat.reshape(2);
+//        cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK);
+//        mat=mat.reshape(1);
+
+//        mnMinX = min(floor(mat.at<float>(0,0)),floor(mat.at<float>(2,0)));
+//        mnMaxX = max(ceil(mat.at<float>(1,0)),ceil(mat.at<float>(3,0)));
+//        mnMinY = min(floor(mat.at<float>(0,1)),floor(mat.at<float>(1,1)));
+//        mnMaxY = max(ceil(mat.at<float>(2,1)),ceil(mat.at<float>(3,1)));
+
+        cv::Mat mat(8,2,CV_32F);
+        mat.at<float>(0,0)=0.0;
+        mat.at<float>(0,1)=0.0;
+        mat.at<float>(1,0)=im.cols;
+        mat.at<float>(1,1)=0.0;
+        mat.at<float>(2,0)=0.0;
+        mat.at<float>(2,1)=im.rows;
+        mat.at<float>(3,0)=im.cols;
+        mat.at<float>(3,1)=im.rows;
+        //
+        mat.at<float>(4,0)=0.0;
+        mat.at<float>(4,1)=float(im.rows) / 2.0;
+        mat.at<float>(5,0)=float(im.cols) / 2.0;
+        mat.at<float>(5,1)=0.0;
+        mat.at<float>(6,0)=float(im.cols) / 2.0;
+        mat.at<float>(6,1)=im.rows;
+        mat.at<float>(7,0)=im.cols;
+        mat.at<float>(7,1)=float(im.rows) / 2.0;
 
         // Undistort corners
         mat=mat.reshape(2);
         cv::undistortPoints(mat,mat,mK,mDistCoef,cv::Mat(),mK);
         mat=mat.reshape(1);
 
-        mnMinX = min(floor(mat.at<float>(0,0)),floor(mat.at<float>(2,0)));
-        mnMaxX = max(ceil(mat.at<float>(1,0)),ceil(mat.at<float>(3,0)));
-        mnMinY = min(floor(mat.at<float>(0,1)),floor(mat.at<float>(1,1)));
-        mnMaxY = max(ceil(mat.at<float>(2,1)),ceil(mat.at<float>(3,1)));
+        mnMinX = INT_MAX;
+        mnMaxX = INT_MIN;
+        mnMinY = INT_MAX;
+        mnMaxY = INT_MIN;
+        //
+        for (int i=0; i<mat.rows; ++i) {
+            if (mnMinX > mat.at<float>(i,0))
+                mnMinX = floor( mat.at<float>(i,0) );
+            if (mnMinY > mat.at<float>(i,1))
+                mnMinY = floor( mat.at<float>(i,1) );
+            //
+            if (mnMaxX < mat.at<float>(i,0))
+                mnMaxX = ceil( mat.at<float>(i,0) );
+            if (mnMaxY < mat.at<float>(i,1))
+                mnMaxY = ceil( mat.at<float>(i,1) );
+        }
 
     }
     else
@@ -346,6 +491,12 @@ void Frame::ComputeImageBounds()
         mnMinY = 0;
         mnMaxY = im.rows;
     }
+
+    std::cout << "func ComputeImageBounds: image bound after undistortion = [ "
+              << mnMinX << ", "
+              << mnMaxX << ", "
+              << mnMinY << ", "
+              << mnMaxY << " ]" << std::endl;
 }
 
 } //namespace ORB_SLAM

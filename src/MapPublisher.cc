@@ -52,10 +52,10 @@ MapPublisher::MapPublisher(Map* pMap):mpMap(pMap), mbCameraUpdated(false)
     mKeyFrames.ns = KEYFRAMES_NAMESPACE;
     mKeyFrames.id=1;
     mKeyFrames.type = visualization_msgs::Marker::LINE_LIST;
-    mKeyFrames.scale.x=0.005;
+    mKeyFrames.scale.x=0.01;
+    //mKeyFrames.scale.x=0.05;
     mKeyFrames.pose.orientation.w=1.0;
     mKeyFrames.action=visualization_msgs::Marker::ADD;
-
     mKeyFrames.color.b=1.0f;
     mKeyFrames.color.a = 1.0;
 
@@ -64,7 +64,8 @@ MapPublisher::MapPublisher(Map* pMap):mpMap(pMap), mbCameraUpdated(false)
     mCovisibilityGraph.ns = GRAPH_NAMESPACE;
     mCovisibilityGraph.id=2;
     mCovisibilityGraph.type = visualization_msgs::Marker::LINE_LIST;
-    mCovisibilityGraph.scale.x=0.002;
+//    mCovisibilityGraph.scale.x=0.002;
+    mCovisibilityGraph.scale.x=0.02;
     mCovisibilityGraph.pose.orientation.w=1.0;
     mCovisibilityGraph.action=visualization_msgs::Marker::ADD;
     mCovisibilityGraph.color.b=0.7f;
@@ -76,11 +77,15 @@ MapPublisher::MapPublisher(Map* pMap):mpMap(pMap), mbCameraUpdated(false)
     mMST.ns = GRAPH_NAMESPACE;
     mMST.id=3;
     mMST.type = visualization_msgs::Marker::LINE_LIST;
-    mMST.scale.x=0.005;
+//    mMST.scale.x=0.005;
+    mMST.scale.x=0.033;
     mMST.pose.orientation.w=1.0;
     mMST.action=visualization_msgs::Marker::ADD;
-    mMST.color.b=0.0f;
-    mMST.color.g=1.0f;
+//    mMST.color.b=0.0f;
+//    mMST.color.g=1.0f;
+//    mMST.color.a = 1.0;
+    mMST.color.b = 0.0f;
+    mMST.color.g = 1.0f;
     mMST.color.a = 1.0;
 
     //Configure Current Camera
@@ -88,7 +93,8 @@ MapPublisher::MapPublisher(Map* pMap):mpMap(pMap), mbCameraUpdated(false)
     mCurrentCamera.ns = CAMERA_NAMESPACE;
     mCurrentCamera.id=4;
     mCurrentCamera.type = visualization_msgs::Marker::LINE_LIST;
-    mCurrentCamera.scale.x=0.01;//0.2; 0.03
+    mCurrentCamera.scale.x=0.025;//0.2; 0.03
+//    mCurrentCamera.scale.x=0.1; 
     mCurrentCamera.pose.orientation.w=1.0;
     mCurrentCamera.action=visualization_msgs::Marker::ADD;
     mCurrentCamera.color.g=1.0f;

@@ -25,6 +25,25 @@
 #include <list>
 #include <opencv/cv.h>
 
+#if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
+#include "SSE2NEON.h"
+#endif
+
+
+#define DETECT_WITH_FAST
+// alternative detectors are crazily slow; no wonder FAST being so popular!
+//#define DETECT_WITH_HARRIS
+//#define DETECT_WITH_SHITOMASI
+//#define DETECT_WITH_DOG
+//#define DETECT_WITH_BOXLOG
+
+#ifdef DETECT_WITH_BOXLOG
+#include "BoxLOG.hpp"
+#endif
+
+
+//#define ORB_EXTRACTOR_TIME_LOGGING
+
 
 namespace ORB_SLAM
 {
@@ -50,6 +69,9 @@ public:
     float inline GetScaleFactor(){
         return scaleFactor;}
 
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+    double time_pre, time_detect, time_blur, time_extract;
+#endif
 
 protected:
 
@@ -73,6 +95,11 @@ protected:
 
     std::vector<cv::Mat> mvImagePyramid;
     std::vector<cv::Mat> mvMaskPyramid;
+
+
+#ifdef DETECT_WITH_BOXLOG
+    ORB_SLAM::BoxLoGDetector * boxLoGDetector_;
+#endif
 
 };
 

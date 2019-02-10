@@ -1,10 +1,27 @@
+##Good Feature Matching Version of ORB-SLAM
+
+Good feature matching is an enhancement module that is designed for feature-based BA SLAM, such as ORB-SLAM.  The main advantage of good feature matching, as opposed to the conventional batch feature matching, is the better trade-off of performance-efficiency.  
+
+This repo is an integration of good feature matching to monocular ORB-SLAM.  When tested on multiple public benchmarks, GF-ORB-SLAM yields the same level of pose tracking latency, while preserving the accuracy & robustness of ORB-SLAM baseline.
+
+If you use GF-ORB-SLAM in an academic work, please cite:
+
+	@inproceedings{zhao2018good,
+	  title={Good Feature Selection for Least Squares Pose Optimization in VO/VSLAM},
+	  author={Zhao, Yipu and Vela, Patricio A},
+	  booktitle={2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+	  pages={1183--1189},
+	  year={2018},
+	  organization={IEEE}
+	}
+
 
 ##Check out our new [ORB-SLAM2](https://github.com/raulmur/ORB_SLAM2) (Monocular, Stereo and RGB-D)
 ---
 # ORB-SLAM Monocular
 **Authors:** [Raul Mur-Artal](http://webdiis.unizar.es/~raulmur/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/), [J. M. M. Montiel](http://webdiis.unizar.es/~josemari/) and [Dorian Galvez-Lopez](http://doriangalvez.com/) ([DBoW2](https://github.com/dorian3d/DBoW2))
 
-**Current version:** 1.0.1 (see [Changelog.md](https://github.com/raulmur/ORB_SLAM/blob/master/Changelog.md))
+**Current version:** 1.0.0 (see [Changelog.md](https://github.com/raulmur/ORB_SLAM/blob/master/Changelog.md))
 
 ORB-SLAM is a versatile and accurate Monocular SLAM solution able to compute in real-time the camera trajectory and a sparse 3D reconstruction of the scene in a wide variety of environments, ranging from small hand-held sequences to a car driven around several city blocks. It is able to close large loops and perform global relocalisation in real-time and from wide baselines.
 
@@ -57,8 +74,10 @@ We use OpenCV to manipulate images and features. If you use a ROS version older 
 
 ##2.4 g2o (included in Thirdparty)
 We use a modified version of g2o (see original at https://github.com/RainerKuemmerle/g2o) to perform optimizations.
-In order to compile g2o you will need to have installed Eigen3 (at least 3.1.0).
-	
+In order to compile g2o you will need to have installed BLAS, LAPACK and Eigen3 (at least 3.1.0).
+
+	sudo apt-get install libblas-dev
+	sudo apt-get install liblapack-dev
 	sudo apt-get install libeigen3-dev
 
 ##2.5 DBoW2 (included in Thirdparty)

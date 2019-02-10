@@ -54,10 +54,17 @@
 *
 *********************************************************************/
 
+#include <opencv2/opencv.hpp>
+//#include <opencv2/core/core.hpp>
+//#include <opencv2/highgui/highgui.hpp>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
+#if CV_MAJOR_VERSION == 3
+#include <opencv2/xfeatures2d/nonfree.hpp> //Thanks to Alessandro
+#endif
+
 #include <vector>
+
+#include <chrono>
 
 #include "ORBextractor.h"
 
@@ -162,9 +169,9 @@ static void computeOrbDescriptor(const KeyPoint& kpt,
     const uchar* center = &img.at<uchar>(cvRound(kpt.pt.y), cvRound(kpt.pt.x));
     const int step = (int)img.step;
 
-    #define GET_VALUE(idx) \
-        center[cvRound(pattern[idx].x*b + pattern[idx].y*a)*step + \
-               cvRound(pattern[idx].x*a - pattern[idx].y*b)]
+#define GET_VALUE(idx) \
+    center[cvRound(pattern[idx].x*b + pattern[idx].y*a)*step + \
+    cvRound(pattern[idx].x*a - pattern[idx].y*b)]
 
 
     for (int i = 0; i < 32; ++i, pattern += 16)
@@ -190,7 +197,7 @@ static void computeOrbDescriptor(const KeyPoint& kpt,
         desc[i] = (uchar)val;
     }
 
-    #undef GET_VALUE
+#undef GET_VALUE
 }
 
 
@@ -455,7 +462,7 @@ static int bit_pattern_31_[256*4] =
 };
 
 ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels, int _scoreType,
-         int _fastTh):
+                           int _fastTh):
     nfeatures(_nfeatures), scaleFactor(_scaleFactor), nlevels(_nlevels),
     scoreType(_scoreType), fastTh(_fastTh)
 {
@@ -508,6 +515,12 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels, int
         umax[v] = v0;
         ++v0;
     }
+
+
+#ifdef DETECT_WITH_BOXLOG
+    boxLoGDetector_ = new ORB_SLAM::BoxLoGDetector();
+#endif
+
 }
 
 static void computeOrientation(const Mat& image, vector<KeyPoint>& keypoints, const vector<int>& umax)
@@ -570,7 +583,7 @@ void ORBextractor::ComputeKeyPoints(vector<vector<KeyPoint> >& allKeypoints)
                 if(hY<=0)
                     continue;
             }
-            
+
             float hX = cellW + 6;
 
             for(int j=0; j<levelCols; j++)
@@ -604,6 +617,7 @@ void ORBextractor::ComputeKeyPoints(vector<vector<KeyPoint> >& allKeypoints)
 
                 cellKeyPoints[i][j].reserve(nfeaturesCell*5);
 
+#if defined DETECT_WITH_FAST
                 FAST(cellImage,cellKeyPoints[i][j],fastTh,true);
 
                 if(cellKeyPoints[i][j].size()<=3)
@@ -612,6 +626,43 @@ void ORBextractor::ComputeKeyPoints(vector<vector<KeyPoint> >& allKeypoints)
 
                     FAST(cellImage,cellKeyPoints[i][j],7,true);
                 }
+#elif defined DETECT_WITH_HARRIS
+                //
+                Mat dst = Mat::zeros( cellImage.size(), CV_32FC1 );
+                cornerHarris( cellImage, dst, 2, 3, 0.04);
+
+                // Normalizing
+                Mat dst_norm, dst_norm_scaled;
+                normalize( dst, dst_norm, 0, 255, NORM_MINMAX, CV_32FC1, Mat() );
+                convertScaleAbs( dst_norm, dst_norm_scaled );
+
+                // Drawing a circle around corners
+                for( int ii = 0; ii < dst_norm.rows ; ii++ )
+                {
+                    for( int jj = 0; jj < dst_norm.cols; jj++ )
+                    {
+                        if( (int) dst_norm.at<float>(ii,jj) > 200 )
+                        {
+                            cellKeyPoints[i][j].push_back(KeyPoint(jj, ii, 2));
+                        }
+                    }
+                }
+
+#elif defined DETECT_WITH_SHITOMASI
+                vector<Point2f> corners;
+                cv::goodFeaturesToTrack(cellImage,corners,2000,0.01,10,cv::Mat(),3,3);
+                for( int ii = 0; ii < corners.size(); ii++ ) {
+                    cellKeyPoints[i][j].push_back(KeyPoint(corners[ii].x, corners[ii].y, 2));
+                }
+#elif defined DETECT_WITH_DOG
+                cv::Ptr<cv::xfeatures2d::SIFT> detector = cv::xfeatures2d::SiftFeatureDetector::create( 1000, 1, 0.04, 10, 1.2);
+                detector->detect(cellImage, cellKeyPoints[i][j]);
+#elif defined DETECT_WITH_BOXLOG
+                // TODO
+                boxLoGDetector_->run(cellImage, cellKeyPoints[i][j]);
+#else
+                // unknown keypoint detector!
+#endif
 
                 if( scoreType == ORB::HARRIS_SCORE )
                 {
@@ -716,7 +767,7 @@ static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Ma
 }
 
 void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
-                      OutputArray _descriptors)
+                               OutputArray _descriptors)
 { 
     if(_image.empty())
         return;
@@ -724,11 +775,30 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
     Mat image = _image.getMat(), mask = _mask.getMat();
     assert(image.type() == CV_8UC1 );
 
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+    //
+    auto t_start = std::chrono::high_resolution_clock::now();
+#endif
+
     // Pre-compute the scale pyramids
     ComputePyramid(image, mask);
 
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+    auto t_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> t_elapsed = t_end - t_start;
+    time_pre = t_elapsed.count();
+    //
+    t_start = std::chrono::high_resolution_clock::now();
+#endif
+
     vector < vector<KeyPoint> > allKeypoints;
     ComputeKeyPoints(allKeypoints);
+
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+    t_end = std::chrono::high_resolution_clock::now();
+    t_elapsed = t_end - t_start;
+    time_detect = t_elapsed.count();
+#endif
 
     Mat descriptors;
 
@@ -746,6 +816,13 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
     _keypoints.clear();
     _keypoints.reserve(nkeypoints);
 
+
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+    //
+    time_blur = 0;
+    time_extract = 0;
+#endif
+
     int offset = 0;
     for (int level = 0; level < nlevels; ++level)
     {
@@ -755,13 +832,32 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
         if(nkeypointsLevel==0)
             continue;
 
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+        //
+        t_start = std::chrono::high_resolution_clock::now();
+#endif
+
         // preprocess the resized image
         Mat& workingMat = mvImagePyramid[level];
         GaussianBlur(workingMat, workingMat, Size(7, 7), 2, 2, BORDER_REFLECT_101);
 
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+        t_end = std::chrono::high_resolution_clock::now();
+        t_elapsed = t_end - t_start;
+        time_blur = t_elapsed.count();
+        //
+        t_start = std::chrono::high_resolution_clock::now();
+#endif
+
         // Compute the descriptors
         Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
         computeDescriptors(workingMat, keypoints, desc, pattern);
+
+#ifdef ORB_EXTRACTOR_TIME_LOGGING
+        t_end = std::chrono::high_resolution_clock::now();
+        t_elapsed = t_end - t_start;
+        time_extract = t_elapsed.count();
+#endif
 
         offset += nkeypointsLevel;
 
@@ -778,6 +874,51 @@ void ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPo
     }
 }
 
+//void ORBextractor::ComputePyramid(cv::Mat image, cv::Mat Mask)
+//{
+//    for (int level = 0; level < nlevels; ++level)
+//    {
+//        float scale = mvInvScaleFactor[level];
+//        Size sz(cvRound((float)image.cols*scale), cvRound((float)image.rows*scale));
+//        Size wholeSize(sz.width + EDGE_THRESHOLD*2, sz.height + EDGE_THRESHOLD*2);
+//        Mat temp(wholeSize, image.type()), masktemp;
+//        mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+
+//        if( !Mask.empty() )
+//        {
+//            masktemp = Mat(wholeSize, Mask.type());
+//            mvMaskPyramid[level] = masktemp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+//        }
+
+//        // Compute the resized image
+//        if( level != 0 )
+//        {
+//            resize(mvImagePyramid[level-1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
+//            if (!Mask.empty())
+//            {
+//                resize(mvMaskPyramid[level-1], mvMaskPyramid[level], sz, 0, 0, INTER_NEAREST);
+//            }
+
+//            copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+//                           BORDER_REFLECT_101+BORDER_ISOLATED);
+//            if (!Mask.empty())
+//                copyMakeBorder(mvMaskPyramid[level], masktemp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+//                               BORDER_CONSTANT+BORDER_ISOLATED);
+//        }
+//        else
+//        {
+//            copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+//                           BORDER_REFLECT_101);
+//            if( !Mask.empty() )
+//                copyMakeBorder(Mask, masktemp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+//                               BORDER_CONSTANT+BORDER_ISOLATED);
+//        }
+//    }
+
+//}
+
+// a specific version designed for by-half downscaling pyramid,
+// which is specifically used for low-powere devices
 void ORBextractor::ComputePyramid(cv::Mat image, cv::Mat Mask)
 {
     for (int level = 0; level < nlevels; ++level)
@@ -797,11 +938,46 @@ void ORBextractor::ComputePyramid(cv::Mat image, cv::Mat Mask)
         // Compute the resized image
         if( level != 0 )
         {
+            //            if ( fabs(scale - 0.5) > 1e-2 ) {
+            // default resize method
             resize(mvImagePyramid[level-1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
             if (!Mask.empty())
             {
                 resize(mvMaskPyramid[level-1], mvMaskPyramid[level], sz, 0, 0, INTER_NEAREST);
             }
+            //                std::cout << "size of current level = " << sz.width << " " << sz.height << std::endl;
+            //            }
+            //            else {
+            //                double t_0 = (double)getTickCount();
+            //                // simply pull out every other pixel
+            ////                mvImagePyramid[level] = Mat(sz, image.type());
+            ////                for (int i=0;i<mvImagePyramid[level].cols;i++){
+            ////                    for (int j=0;j<mvImagePyramid[level].rows;j++){
+            ////                        mvImagePyramid[level]<image.type()> (i, j) = mvImagePyramid[level-1]<image.type()> (i*2, j*2);
+            ////                    }
+            ////                }
+            //                double t_1 = (double)getTickCount();
+
+            //                resize(mvImagePyramid[level-1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
+
+            //                double t_2 = (double)getTickCount();
+
+            //                std::cout << "time original = " << (t_2-t_1)/(double)getTickFrequency() << "time new = " << (t_1-t_0)/(double)getTickFrequency() << std::endl;
+
+            ////                if (!Mask.empty())
+            ////                {
+            ////                    mvMaskPyramid[level] = Mat(sz, Mask.type());
+            ////                    for (int i=0;i<mvMaskPyramid[level].cols;i++){
+            ////                        for (int j=0;j<mvMaskPyramid[level].rows;j++){
+            ////                            mvMaskPyramid[level]<Mask.type()> (i, j) = mvMaskPyramid[level-1]<Mask.type()> (i*2, j*2);
+            ////                        }
+            ////                    }
+            ////                }
+            //                if (!Mask.empty())
+            //                {
+            //                    resize(mvMaskPyramid[level-1], mvMaskPyramid[level], sz, 0, 0, INTER_NEAREST);
+            //                }
+            //            }
 
             copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
                            BORDER_REFLECT_101+BORDER_ISOLATED);

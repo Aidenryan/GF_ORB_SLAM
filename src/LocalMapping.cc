@@ -45,32 +45,65 @@ void LocalMapping::SetTracker(Tracking *pTracker)
 
 void LocalMapping::Run()
 {
+    //
+    arma::wall_clock timer;
+
 
     ros::Rate r(500);
     while(ros::ok())
     {
         // Check if there are keyframes in the queue
         if(CheckNewKeyFrames())
-        {            
+        {
             // Tracking will see that Local Mapping is busy
             SetAcceptKeyFrames(false);
 
+#ifdef LOCAL_BA_TIME_LOGGING
+            logCurrentKeyFrame.setZero();
+            logCurrentKeyFrame.frame_time_stamp = mlNewKeyFrames.front()->mTimeStamp;
+            //
+            timer.tic();
+#endif
             // BoW conversion and insertion in Map
             ProcessNewKeyFrame();
+
+#ifdef LOCAL_BA_TIME_LOGGING
+            logCurrentKeyFrame.time_proc_new_keyframe = timer.toc();
+            timer.tic();
+#endif
 
             // Check recent MapPoints
             MapPointCulling();
 
+#ifdef LOCAL_BA_TIME_LOGGING
+            logCurrentKeyFrame.time_map_point_culling = timer.toc();
+            timer.tic();
+#endif
+
             // Triangulate new MapPoints
             CreateNewMapPoints();
 
+#ifdef LOCAL_BA_TIME_LOGGING
+            logCurrentKeyFrame.time_tri_new_map_point = timer.toc();
+            timer.tic();
+#endif
+
             // Find more matches in neighbor keyframes and fuse point duplications
             SearchInNeighbors();
+
+#ifdef LOCAL_BA_TIME_LOGGING
+            logCurrentKeyFrame.time_srh_more_neighbor = timer.toc();
+#endif
 
             mbAbortBA = false;
 
             if(!CheckNewKeyFrames() && !stopRequested())
             {
+
+#ifdef LOCAL_BA_TIME_LOGGING
+                timer.tic();
+#endif
+
                 // Local BA
                 Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA);
 
@@ -82,9 +115,17 @@ void LocalMapping::Run()
                 // Tracking will see Local Mapping idle
                 if(!CheckNewKeyFrames())
                     SetAcceptKeyFrames(true);
+
+#ifdef LOCAL_BA_TIME_LOGGING
+                logCurrentKeyFrame.time_local_BA = timer.toc();
+#endif
             }
 
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+
+#ifdef LOCAL_BA_TIME_LOGGING
+            mBATimeLog.push_back(logCurrentKeyFrame);
+#endif
         }
 
         // Safe area to stop
@@ -113,7 +154,6 @@ void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
     SetAcceptKeyFrames(false);
 }
 
-
 bool LocalMapping::CheckNewKeyFrames()
 {
     boost::mutex::scoped_lock lock(mMutexNewKFs);
@@ -122,11 +162,9 @@ bool LocalMapping::CheckNewKeyFrames()
 
 void LocalMapping::ProcessNewKeyFrame()
 {
-    {
-        boost::mutex::scoped_lock lock(mMutexNewKFs);
-        mpCurrentKeyFrame = mlNewKeyFrames.front();
-        mlNewKeyFrames.pop_front();
-    }
+    boost::mutex::scoped_lock lock(mMutexNewKFs);
+    mpCurrentKeyFrame = mlNewKeyFrames.front();
+    mlNewKeyFrames.pop_front();
 
     // Compute Bags of Words structures
     mpCurrentKeyFrame->ComputeBoW();
@@ -163,7 +201,7 @@ void LocalMapping::ProcessNewKeyFrame()
                 mlpRecentAddedMapPoints.push_back(pMP);
             }
         }
-    }  
+    }
 
     // Update links in the Covisibility Graph
     mpCurrentKeyFrame->UpdateConnections();
@@ -580,8 +618,8 @@ void LocalMapping::KeyFrameCulling()
 cv::Mat LocalMapping::SkewSymmetricMatrix(const cv::Mat &v)
 {
     return (cv::Mat_<float>(3,3) <<             0, -v.at<float>(2), v.at<float>(1),
-                                  v.at<float>(2),               0,-v.at<float>(0),
-                                 -v.at<float>(1),  v.at<float>(0),              0);
+            v.at<float>(2),               0,-v.at<float>(0),
+            -v.at<float>(1),  v.at<float>(0),              0);
 }
 
 void LocalMapping::RequestReset()
@@ -595,9 +633,9 @@ void LocalMapping::RequestReset()
     while(ros::ok())
     {
         {
-        boost::mutex::scoped_lock lock2(mMutexReset);
-        if(!mbResetRequested)
-            break;
+            boost::mutex::scoped_lock lock2(mMutexReset);
+            if(!mbResetRequested)
+                break;
         }
         r.sleep();
     }

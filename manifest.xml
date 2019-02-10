@@ -1,7 +1,7 @@
 <package>
-  <description brief="ORB_SLAM">
+  <description brief="GF_ORB_SLAM">
 
-     ORB_SLAM
+     GF_ORB_SLAM
 
   </description>
   <author>Raul Mur-Artal</author>
@@ -9,9 +9,9 @@
   <depend package="roscpp"/>
   <depend package="tf"/>
   <depend package="sensor_msgs"/>
-  <depend package="opencv2"/>
   <depend package="image_transport"/>
   <depend package="cv_bridge"/>
+  <depend package="std_msgs"/>
 
 
 </package>

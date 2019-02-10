@@ -27,7 +27,9 @@
 #include "Tracking.h"
 #include <boost/thread.hpp>
 #include "KeyFrameDatabase.h"
+#include "Util.hpp"
 
+//#define LOCAL_BA_TIME_LOGGING
 
 namespace ORB_SLAM
 {
@@ -66,6 +68,27 @@ public:
 
     void InterruptBA();
 
+
+    void SaveTimeLog(std::string filename) {
+        //
+        ofstream fBATimeLog;
+        fBATimeLog.open(filename.c_str());
+        fBATimeLog << fixed;
+        fBATimeLog << "#frame_time_stamp time_proc_new_keyframe time_map_point_culling time_tri_new_map_point time_srh_more_neighbor time_local_BA" << std::endl;
+        for(size_t i=0; i<mBATimeLog.size(); i++)
+        {
+            fBATimeLog << setprecision(6)
+                          << mBATimeLog[i].frame_time_stamp << " "
+                          << mBATimeLog[i].time_proc_new_keyframe << " "
+                          << mBATimeLog[i].time_map_point_culling << " "
+                          << mBATimeLog[i].time_tri_new_map_point << " "
+                          << mBATimeLog[i].time_srh_more_neighbor << " "
+                          << mBATimeLog[i].time_local_BA << std::endl;
+        }
+        fBATimeLog.close();
+    }
+
+
 protected:
 
     bool CheckNewKeyFrames();
@@ -84,6 +107,11 @@ protected:
     void ResetIfRequested();
     bool mbResetRequested;
     boost::mutex mMutexReset;
+
+
+    // Time log
+    vector<TimeLog> mBATimeLog;
+    TimeLog logCurrentKeyFrame;
 
     Map* mpMap;
 

@@ -106,17 +106,136 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     threadH.join();
     threadF.join();
 
+
+//    cv::Mat E = mK.t() * F * mK;
+//    cout << "E21 = " << E << endl;
+//    cout << "F21 = " << F << endl;
+//    cout << "H21 = " << H << endl;
+
+
     // Compute ratio of scores
     float RH = SH/(SH+SF);
 
     // Try to reconstruct from homography or fundamental depending on the ratio (0.40-0.45)
     if(RH>0.40)
-        return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
+    {
+        cout << "try reconstructing with homography matrix!" << endl;
+        return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,THRES_INIT_MPT_NUM/2);
+    }
     else //if(pF_HF>0.6)
-        return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
+    {
+        cout << "try reconstructing with fundemental matrix!" << endl;
+        return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,THRES_INIT_MPT_NUM/2);
+    }
 
     return false;
 }
+
+
+void Initializer::CrossProductMatrix(const cv::Mat &x, cv::Mat & Cx) {
+    //
+    assert(x.rows == 3 && x.cols == 1 && x.type() == CV_32F);
+    Cx = cv::Mat(3, 3, CV_32F);
+//    X <<     0, -x(2),  x(1),
+//            x(2),     0, -x(0),
+//            -x(1),  x(0),     0;
+    Cx.at<float>(0, 0) = 0;
+    Cx.at<float>(0, 1) = -x.at<float>(2, 0);
+    Cx.at<float>(0, 2) = x.at<float>(1, 0);
+    //
+    Cx.at<float>(1, 0) = x.at<float>(2, 0);
+    Cx.at<float>(1, 1) = 0;
+    Cx.at<float>(1, 2) = -x.at<float>(0, 0);
+    //
+    Cx.at<float>(2, 0) = -x.at<float>(1, 0);
+    Cx.at<float>(2, 1) = x.at<float>(0, 0);
+    Cx.at<float>(2, 2) = 0;
+    //
+    return ;
+}
+
+
+#if CV_MAJOR_VERSION == 3
+int Initializer::Initialize_withRT(const Frame &CurrentFrame, const vector<int> &vMatches12,
+                                   const cv::Mat &R21, const cv::Mat &t21,
+                                   vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
+{
+    // Fill structures with current keypoints and matches with reference frame
+    // Reference Frame: 1, Current Frame: 2
+    mvKeys2 = CurrentFrame.mvKeysUn;
+
+    mvMatches12.clear();
+    mvMatches12.reserve(mvKeys2.size());
+    mvbMatched1.resize(mvKeys1.size());
+    for(size_t i=0, iend=vMatches12.size();i<iend; i++)
+    {
+        if(vMatches12[i]>=0)
+        {
+            mvMatches12.push_back(make_pair(i,vMatches12[i]));
+            mvbMatched1[i]=true;
+        }
+        else
+            mvbMatched1[i]=false;
+    }
+
+    // generate fundemental matrix from P, R, T
+    cv::Mat E21, F21, t21_cross;
+    //    cv::sfm::essentialFromRt(cv::Mat::eye(3, 3, CV_32F),
+    //                             cv::Mat::zeros(3, 1, CV_32F),
+    //                             R21, t21, E21);
+    //    cv::sfm::fundamentalFromEssential(E21, mK, mK, F21);
+    CrossProductMatrix(t21, t21_cross);
+    E21 = t21_cross * R21;
+    F21 = (mK.inv()).t() * E21 * mK.inv();
+
+//    cout << "R21 = " << R21 << "; t21 = " << t21 << endl;
+//    cout << "E21 = " << E21 << endl;
+//    cout << "F21 = " << F21 << endl;
+
+    // check for inliers that supports the fundemental matrix
+    const int N = mvMatches12.size();
+    std::vector<bool> vbMatchesInliers(N, false);
+    cv::Mat hx1(3, 1, CV_32F), hx2(3, 1, CV_32F);
+    size_t inlier_count = 0;
+    for(size_t i=0; i<N; i++) {
+
+        hx1.at<float>(0, 0) =  mvKeys1[mvMatches12[i].first].pt.x;
+        hx1.at<float>(1, 0) =  mvKeys1[mvMatches12[i].first].pt.y;
+        hx1.at<float>(2, 0) =  1.0f;
+        //
+        hx2.at<float>(0, 0) =  mvKeys2[mvMatches12[i].second].pt.x;
+        hx2.at<float>(1, 0) =  mvKeys2[mvMatches12[i].second].pt.y;
+        hx2.at<float>(2, 0) =  1.0f;
+
+        //        cout << "hx1 = " << hx1 << endl;
+        //        cout << "hx2 = " << hx2 << endl;
+        //        cout << "err = " << hx2.dot(F21 * hx1) << endl;
+
+        cv::Mat F_x = F21 * hx1;
+        if (fabs( hx2.dot(F_x) / F_x.at<float>(2, 0) ) < 1.0) {
+            vbMatchesInliers[i] = true;
+            inlier_count ++;
+        }
+    }
+
+    cout << "inliers passed the fundamental matrix check = " << inlier_count << endl;
+
+    // Reconstruct with the 4 hyphoteses and check
+    float parallax;
+
+    // triangulate the inliers
+    int nGood = CheckRT(R21,t21,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,mK, vP3D, 4.0*mSigma2, vbTriangulated, parallax);
+
+    return nGood;
+}
+#else
+int Initializer::Initialize_withRT(const Frame &CurrentFrame, const vector<int> &vMatches12,
+                                   const cv::Mat &R21, const cv::Mat &t21,
+                                   vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated) {
+    std::cout << "no opencv2 compatible impl of func Initialize_withRT!" << std::endl;
+    return -1;
+}
+#endif
 
 
 void Initializer::FindHomography(vector<bool> &vbMatchesInliers, float &score, cv::Mat &H21)
@@ -295,6 +414,7 @@ cv::Mat Initializer::ComputeF21(const vector<cv::Point2f> &vP1,const vector<cv::
 
     cv::SVDecomp(Fpre,w,u,vt,cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
 
+    // w.at<float>(2,2)=0;
     w.at<float>(2)=0;
 
     return  u*cv::Mat::diag(w)*vt;
@@ -466,7 +586,7 @@ float Initializer::CheckFundamental(const cv::Mat &F21, vector<bool> &vbMatchesI
 }
 
 bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv::Mat &K,
-                            cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
+                               cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
 {
     int N=0;
     for(size_t i=0, iend = vbMatchesInliers.size() ; i<iend; i++)
@@ -479,7 +599,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     cv::Mat R1, R2, t;
 
     // Recover the 4 motion hypotheses
-    DecomposeE(E21,R1,R2,t);  
+    DecomposeE(E21,R1,R2,t);
 
     cv::Mat t1=t;
     cv::Mat t2=-t;
@@ -568,7 +688,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 }
 
 bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,
-                      cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
+                               cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
 {
     int N=0;
     for(size_t i=0, iend = vbMatchesInliers.size() ; i<iend; i++)
@@ -685,7 +805,7 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
 
 
     int bestGood = 0;
-    int secondBestGood = 0;    
+    int secondBestGood = 0;
     int bestSolutionIdx = -1;
     float bestParallax = -1;
     vector<cv::Point3f> bestP3D;
@@ -715,8 +835,14 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         }
     }
 
+// std::cout <<  std::endl;
+// std::cout << "init check 1: " << bool(secondBestGood<0.85*bestGood) << std::endl;
+// std::cout << "init check 2: " << bool(bestParallax>=minParallax) << std::endl;
+// std::cout << "init check 3: " << bool(bestGood>minTriangulated) << std::endl;
+// std::cout << "init check 4: " << bool(bestGood>0.9*N) << std::endl;
 
     if(secondBestGood<0.75*bestGood && bestParallax>=minParallax && bestGood>minTriangulated && bestGood>0.9*N)
+    // if(secondBestGood<0.85*bestGood && bestParallax>=minParallax && bestGood>minTriangulated && bestGood>0.9*N)
     {
         vR[bestSolutionIdx].copyTo(R21);
         vt[bestSolutionIdx].copyTo(t21);
@@ -794,8 +920,8 @@ void Initializer::Normalize(const vector<cv::KeyPoint> &vKeys, vector<cv::Point2
 
 
 int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
-                       const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers,
-                       const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
+                         const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers,
+                         const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
 {
     // Calibration parameters
     const float fx = K.at<float>(0,0);
@@ -838,6 +964,7 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
 
         if(!isfinite(p3dC1.at<float>(0)) || !isfinite(p3dC1.at<float>(1)) || !isfinite(p3dC1.at<float>(2)))
         {
+//            cout << "condition check 1?" << endl;
             vbGood[vMatches12[i].first]=false;
             continue;
         }
@@ -852,14 +979,18 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
         float cosParallax = normal1.dot(normal2)/(dist1*dist2);
 
         // Check depth in front of first camera (only if enough parallax, as "infinite" points can easily go to negative depth)
-        if(p3dC1.at<float>(2)<=0 && cosParallax<0.99998)
+        if(p3dC1.at<float>(2)<=0 && cosParallax<0.99998) {
+//            cout << "condition check 2?" << endl;
             continue;
+        }
 
         // Check depth in front of second camera (only if enough parallax, as "infinite" points can easily go to negative depth)
         cv::Mat p3dC2 = R*p3dC1+t;
 
-        if(p3dC2.at<float>(2)<=0 && cosParallax<0.99998)
+        if(p3dC2.at<float>(2)<=0 && cosParallax<0.99998) {
+//            cout << "condition check 3?" << endl;
             continue;
+        }
 
         // Check reprojection error in first image
         float im1x, im1y;
@@ -869,8 +1000,10 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
 
         float squareError1 = (im1x-kp1.pt.x)*(im1x-kp1.pt.x)+(im1y-kp1.pt.y)*(im1y-kp1.pt.y);
 
-        if(squareError1>th2)
+        if(squareError1>th2) {
+//            cout << "condition check 4?" << endl;
             continue;
+        }
 
         // Check reprojection error in second image
         float im2x, im2y;
@@ -880,8 +1013,10 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
 
         float squareError2 = (im2x-kp2.pt.x)*(im2x-kp2.pt.x)+(im2y-kp2.pt.y)*(im2y-kp2.pt.y);
 
-        if(squareError2>th2)
+        if(squareError2>th2) {
+            cout << "condition check 5?" << endl;
             continue;
+        }
 
         vCosParallax.push_back(cosParallax);
         vP3D[vMatches12[i].first] = cv::Point3f(p3dC1.at<float>(0),p3dC1.at<float>(1),p3dC1.at<float>(2));
