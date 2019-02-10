@@ -11,22 +11,26 @@ Good feature matching is an enhancement module that is designed for feature-base
 
 This repo is an integration of good feature matching to monocular ORB-SLAM.  When tested on multiple public benchmarks, GF-ORB-SLAM yields the same level of pose tracking latency, while preserving the accuracy & robustness of ORB-SLAM baseline.
 
-To build GF-ORB-SLAM, first clone the repo to your ros workspace:
+To build GF-ORB-SLAM, first clone the repo to your ros workspace
 
 	git clone git@github.com:peter-zhao/GF_ORB_SLAM.git
 
 Then follow the instructions of ORB-SLAM to prepare the dependencies of ORB-SLAM: eigen, cholmod, gl/glew.  
-On top of that, build additional dependencies for good feature by calling:
+On top of that, build additional dependencies for good feature by calling
 
 	./build_dep.sh
 
-The last step is to build the GF-ORB-SLAM itself:
+The last step is to build the GF-ORB-SLAM itself
 
 	./build.sh
 
 To run GF-ORB-SLAM, please refer to some example batch evaluation scripts at folder 
 
 	batch_script
+
+Some example configurations for public benchmarks are available by cloning the following repo and place it at the same ros workspace as GF-ORB-SLAM
+
+	git clone git@github.com:peter-zhao/ORB_Data.git
 
 ## Reference(s)
 
