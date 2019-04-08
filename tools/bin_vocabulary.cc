@@ -1,3 +1,9 @@
+/*
+* Built upon ORB-SLAM pull request
+* https://github.com/raulmur/ORB_SLAM2/pull/21/commits/4122702ced85b20bd458d0e74624b9610c19f8cc
+* which is originally implemented by github user poine
+*/
+
 #include <time.h>
 
 #include "ORBVocabulary.h"
