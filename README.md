@@ -13,7 +13,7 @@ This repo is an integration of good feature matching to monocular ORB-SLAM.  Whe
 
 To build GF-ORB-SLAM, first clone the repo to your ros workspace
 
-	git clone git@github.com:ivalab/GF_ORB_SLAM.git
+	git clone https://github.com/ivalab/GF_ORB_SLAM.git
 
 Then follow the instructions of ORB-SLAM to prepare the dependencies of ORB-SLAM: eigen, cholmod, gl/glew.  
 On top of that, build additional dependencies for good feature by calling
@@ -30,7 +30,7 @@ To run GF-ORB-SLAM, please refer to some example batch evaluation scripts at fol
 
 Some example configurations for public benchmarks are available by cloning the following repo and place it at the same ros workspace as GF-ORB-SLAM
 
-	git clone git@github.com:ivalab/ORB_Data.git
+	git clone https://github.com/ivalab/ORB_Data.git
 
 ## Reference(s)
 
