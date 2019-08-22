@@ -2164,7 +2164,11 @@ bool Observability::maxVolDeletion_GroupedGreedy(const size_t stIdx, const size_
     timer.tic();
 
     // define the size of random subset
-    size_t szLazierSubset = static_cast<size_t>( double(edIdx - stIdx) / double(mpLimit) * sampleScale );
+    // in practice, multiplication factor 1.0 works better on many sequences
+    // size_t szLazierSubset = static_cast<size_t>( float(N) / float(num_to_match) * 1.0 );
+    // in theory, multiplication factor 2.3 is equivalant to decay factor of 0.1
+    size_t szLazierSubset = static_cast<size_t>( float(N) / float(num_to_match) * 2.3 );
+
     // iteratively search for the most informative lmk
     arma::mat curMat = arma::eye( size(lmkSelectPool[0].obs_block) ) * 0.00001;
 
