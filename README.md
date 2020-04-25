@@ -1,3 +1,5 @@
+An [ORB-SLAM2](https://github.com/ivalab/gf_orb_slam2) implementation with full features we developed at ivalab can be found at https://github.com/ivalab/gf_orb_slam2
+
 # Good Feature Matching Version of ORB-SLAM
 
 Good feature matching is an enhancement module that is designed for feature-based BA SLAM, such as ORB-SLAM.  The main advantage of good feature matching, as opposed to the conventional batch feature matching, is the better trade-off of performance-efficiency.  
